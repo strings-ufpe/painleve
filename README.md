@@ -1,4 +1,4 @@
-# painleve
+# Painlevé
 
 These incorporate implementations of the expansion of isomonodromic tau functions in python/Julia
 
@@ -12,6 +12,7 @@ Done:
 - Small parameter expansion of Painlevé V and VI in SciPy. Includes accessory parameter expansion
 
 Immediate goals:
+- Fredholm determinant expansion for Painlevé V
 - Faster numerics (Julia vs Python)
 - Large parameter expansion for Painlevé V
 - Five regular singular points, with asymptotic expansion for the accessory parameter.
