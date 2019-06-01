@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# This implements the Nekrasov expansion for the Painlevé V tau function, algebraically
+
 from sympy import *
 from mpmath import mp
 import matplotlib.pyplot as plt
@@ -14,8 +16,8 @@ th0, tht, thi = symbols('theta0 thetat thetai')
 sig, s1t, s01, ess = symbols('sigma s1t s01 ess')
 tau, cvi, cbl = symbols('tau cvi cbl')
 
-Nexp = 4
-Nblk = 10
+Nexp = 2
+Nblk = 3
 'The number Nexp is associated to the channels n, in the future I will fix Nexp =3'
 'The number Nblk is associated to the expansion of the Conformal Block, in the future I will fix Nblk =8'
 

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+# This implements the Nekrasov expansion for the Painlevé VI tau function, algebraically
+
 from sympy import *
 from mpmath import mp
 import matplotlib.pyplot as plt

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# This is reference numerical Nekrasov expansion for Painlevé V and VI
+
 from pathos.pools import ProcessPool
 from functools import partial
 from mpmath import mp
@@ -70,7 +72,7 @@ def hook_length(partition,i,j):
     return 0
 
 def coefficientV(partition1,partition2,theta,channel):
-    
+
   b12 = 1.0+0.0j
   for i1 in range(len(partition1)):
     for k1 in range(partition1[i1]):
@@ -89,7 +91,7 @@ def coefficientV(partition1,partition2,theta,channel):
   return b12
 
 def conformal_blockV(theta,channel,level):
-    
+
     cf12 = 0.0+0.0j
     p = level
     q = 0
@@ -102,7 +104,7 @@ def conformal_blockV(theta,channel,level):
     return cf12
 
 def coefficientVI(partition1,partition2,theta,channel):
-    
+
   b12 = 1.0+0.0j
   for i1 in range(len(partition1)):
     for k1 in range(partition1[i1]):
@@ -121,7 +123,7 @@ def coefficientVI(partition1,partition2,theta,channel):
   return b12
 
 def conformal_blockVI(theta,channel,level):
-    
+
   cf12 = 0.0+0.0j
   p = level
   q = 0
@@ -134,7 +136,7 @@ def conformal_blockVI(theta,channel,level):
   return cf12
 
 def structure_constantV(theta,channel):
-    
+
   cn12 = 1.0+0.0j
   for i1 in ( mp.mpc('-1.0'), mp.mpc('1.0') ):
     cn12 *= mp.barnesg(1+theta[2]/2.0+i1*channel/2.0)\
@@ -142,7 +144,7 @@ def structure_constantV(theta,channel):
             *mp.barnesg(1+theta[1]/2.0-theta[0]/2.0+i1*channel/2.0)\
             /mp.barnesg(1+i1*channel)
   return cn12
-                    
+
 def structure_constantVI(theta,channel):
 
   cn12 = 1.0+0.0j
@@ -164,9 +166,9 @@ def expand_tauVI_parallel(index,theta,channel,ess):
 def essVI(thetas,sigmas,t0=0):
   pis = [ 2.0*mp.cos(mp.pi*thetas[i1]) for i1 in range(len(thetas)) ]
   pijs = [ 2.0*mp.cos(mp.pi*sigmas[i1]) for i1 in range(len(sigmas)) ]
-  
+
   pijs[2] = fricke_jimbo(pis,pijs)
-  
+
   if t0 == 0:
     return ((pis[1]*pis[2]+pis[0]*pis[3]-2.0*pijs[1]-pijs[0]*pijs[2])\
            -(pis[0]*pis[2]+pis[1]*pis[3]-2.0*pijs[2]-pijs[0]*pijs[1])\
@@ -181,7 +183,7 @@ def essVI(thetas,sigmas,t0=0):
            /(2*mp.cos(mp.pi*(thetas[2]-sigmas[0]))-pis[3])
 
 def connection_coeff(thetas,sigmas):
-  
+
   pis = [ 2.0*mp.cos(mp.pi*theta[i1]) for i1 in range(len(theta)) ]
   pijs = [ 2.0*mp.cos(mp.pi*sigma[i1]) for i1 in range(len(sigma)) ]
   pijs[2] = fricke_jimbo(pis,pijs)
@@ -232,7 +234,7 @@ def expand_tauVI(theta,channel,ess):
   return taucoefficients
 
 def expand_tauV(theta,channel,ess):
-  
+
   indices = [ (a,b) for a in range(2*Nexp+1) for b in range(Ntable) ]
   pool0 = ProcessPool()
   tauV_parallel = partial( expand_tauV_parallel, theta=theta, channel=channel, ess=ess)
@@ -251,10 +253,10 @@ def tchannel(th,sig):
   sig[0], sig[1] = sig[1], sig[0]
   return th,sig
 
-def tauV(coefficients,thetas,channel,ess,t):
-  
+def tauV(coefficients,thetas,channel,t):
+
   tau11 = 0.0+0.0j
-  
+
   for i1 in range(2*Nexp+1):
     tau12 = 0.0+0.0j
     for j1 in range(Ntable):
@@ -265,7 +267,7 @@ def tauV(coefficients,thetas,channel,ess,t):
 
 
 def tauVI(coefficients,thetas,channel,t, t0=0):
-  
+
   if t0 == 0:
     chi = 1.0
   else:
@@ -273,7 +275,7 @@ def tauVI(coefficients,thetas,channel,t, t0=0):
     chi = 1.0
 
   tau11 = 0.0+0.0j
-  
+
   for i1 in range(2*Nexp+1):
     tau12 = 0.0+0.0j
     for j1 in range(Ntable):

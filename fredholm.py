@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# This is the Fredholm expansion for Painlevé VI
+
 from pathos.pools import ProcessPool
 from functools import partial
 from mpmath import mp
@@ -46,8 +48,10 @@ def computeeta(thetas,sigmas,t0=0):
 
 def esshatV(thetas,sigma,ess):
   return ess*(mp.gamma(1-sigma)**2/mp.gamma(1+sigma))**2\
-            *mp.gamma(1+(sigma+thetas[2])/2)*mp.gamma(1+(sigma+thetas[1]+thetas[0])/2)*mp.gamma(1+(sigma+thetas[1]-thetas[0])/2)\
-            *mp.gamma(1-(sigma-thetas[2])/2)*mp.gamma(1-(sigma-thetas[1]-thetas[0])/2)*mp.gamma(1-(sigma-thetas[1]+thetas[0])/2)
+            *mp.gamma(1+(sigma+thetas[2])/2)*mp.gamma(1+(sigma+thetas[1]+thetas[0])/2)\
+            *mp.gamma(1+(sigma+thetas[1]-thetas[0])/2)\
+            *mp.gamma(1-(sigma-thetas[2])/2)*mp.gamma(1-(sigma-thetas[1]-thetas[0])/2)\
+            *mp.gamma(1-(sigma-thetas[1]+thetas[0])/2)
 
 def tchannel(th,sig):
   th[0], th[2] = th[2], th[0]

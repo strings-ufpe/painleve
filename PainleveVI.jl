@@ -2,6 +2,9 @@ using LinearAlgebra
 using Base.Threads
 using Nemo
 
+# This implments the Fredholm determinant expansion for the Painlevé VI
+# tau function, numerically. It is written in arbitrary precision routine
+
 JULIA_NUM_THREADS=4
 N = 64
 CC = ComplexField(256)
