@@ -1,0 +1,318 @@
+using SpecialFunctions
+using LinearAlgebra
+using Base.Threads
+using FastGaussQuadrature
+using SingularIntegralEquations.HypergeometricFunctions
+
+JULIA_NUM_THREADS=8
+N = 100
+R = 1e10
+
+function frickejimbo(Pμ, Pμν)
+    b = Pμν[1]*Pμν[2] - Pμ[1]*Pμ[3] - Pμ[2]*Pμ[4];
+    c = (Pμν[1])^2 +(Pμν[2])^2 +(Pμ[1])^2 +(Pμ[2])^2 +(Pμ[3])^2 +(Pμ[4])^2 +
+        (Pμ[1]*Pμ[2]*Pμ[3]*Pμ[4])-Pμν[1]*(Pμ[1]*Pμ[2]+Pμ[3]*Pμ[4])-
+        Pμν[2]*(Pμ[1]*Pμ[4]+Pμ[2]*Pμ[3]);
+
+     return (-b - sqrt((b^2 - 4c)))/2
+end
+
+function computeη(θμ, θμν, t0 = 0)
+    Pμ = (2 .*(cosc.(θμ)));
+    Pμν = (2 .*(cosc.(θμν)));
+
+    Pμν[3] = frickejimbo(Pμ, Pμν);
+
+    if (t0 ==0)
+        prefactor = Pμ[2]*Pμ[3] + Pμ[1]*Pμ[4] - 2Pμν[2] - Pμν[1]*Pμν[3] -
+                    (Pμ[1]*Pμ[3] + Pμ[2]*Pμ[4] - 2Pμν[3] - Pμν[1]*Pμν[2])*
+                    (exp(θμν[1]*im*pi));
+    else
+        prefactor = Pμ[2]*Pμ[3] + Pμ[1]*Pμ[4] - 2Pμν[2] - Pμν[3]*Pμν[1] -
+                    (Pμ[1]*Pμ[3] + Pμ[2]*Pμ[4] - 2Pμν[3] - Pμν[2]*Pμν[1])*
+                    (exp(-θμν[1]*pi*im));
+    end
+
+    hugeΓfac = (gamma(1-θμν[1])^2)*gamma(1+(θμ[2]+θμ[1]+θμν[1])/2)*
+                gamma(1+(θμ[2]-θμ[1]+θμν[1])/2)*gamma(1+(θμ[3]+θμ[4]+θμν[1])/2)*
+                gamma(1+(θμ[3]-θμ[4]+θμν[1])/2)/
+                (16*(pi^2)*sinpi((θμν[1]+θμ[1]-θμ[2])/2)*
+                sinpi((θμν[1]-θμ[3]+θμ[4])/2))*
+                gamma((θμν[1]-θμ[1]-θμ[2])/2)*gamma((θμν[1]-θμ[3]-θμ[4])/2)*
+                (gamma(1+θμν[1])^2)*gamma(1+(θμ[2]-θμ[1]-θμν[1])/2)*
+                gamma(1+(θμ[3]-θμ[4]-θμν[1])/2);
+    return (hugeΓfac*prefactor)
+end
+
+function Kera(θμ, σ)
+    n,w = gausslegendre(N)
+    kernela = zeros(ComplexF64, 2N, 2N)
+    a = (θμ[3]+θμ[4]);
+    b = (θμ[3]-θμ[4]);
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j)
+                kernela[i,j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ( ((1-(R*exp(pi*im*n[j])))^(2θμ[3]))*(((θμ[3]+σ)^2 - θμ[4]^2)*
+                _₂F₁(a+σ+1,b+σ+1,1+2σ,(R*exp(pi*im*n[i])))*
+                _₂F₁((a-σ),(b-σ),(-2σ),(R*exp(pi*im*n[j]))) -
+                (((((θμ[4]^2 - (θμ[3]+σ)^2)*(θμ[4]^2- (θμ[3]-σ)^2))/(4σ*(1-(4*(σ^2))))))*
+                ((R^2)*(exp(pi*im*(n[j]))))*((_₂F₁(1+a-σ, 1+b-σ, 2-2σ, (R*exp(pi*im*n[j]))))+
+                ((((1+θμ[3]+σ)^2 - θμ[4]^2)/(1+2σ))*
+                _₂F₁(2+a+σ,2+b+σ, 3+2σ,(R*exp(im*pi*n[i]) ) ) ))) ));
+
+            else
+                kernela[i,j] =  (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ( ( ((1-(R*exp(pi*im*n[j])))^(2θμ[3]))*
+                ( (_₂F₁((a+σ),(b+σ),2σ,(R*exp(pi*im*n[i])))*
+                _₂F₁((a-σ),(b-σ),(-2σ),(R*exp(pi*im*n[j]))))
+                + ((((θμ[4]^2 - (θμ[3]+σ)^2)*(θμ[4]^2- (θμ[3]-σ)^2))/(4σ*(1-(4*(σ^2)))))*
+                ((R^2)*(exp(pi*im*(n[i]+n[j]))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(R*exp(pi*im*n[i])))*
+                _₂F₁(1+a-σ,1+b-σ,2-2σ,(R*exp(pi*im*n[j]))))) ) )-1)/((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j])));
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j )
+                kernela[i,(j+N)] =  (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ((((1-(R*exp(im*pi*n[j])))^(2θμ[3])))*
+                (((θμ[4]^2 - (θμ[3]+ σ)^2 )^2)/(2σ*(1+σ)))*
+                (((_₂F₁(a+σ,b+σ,2σ,(R*exp(pi*im*n[j]))))*
+                ((_₂F₁(1+a+σ,1+b+σ,2+2σ,(R*exp(pi*im*n[i]))))+
+                ((((1+θμ[3]+σ)^2 - θμ[4]^2)/(2+2σ))*(R*exp(pi*im*n[i]))*
+                (_₂F₁(2+a+σ,2+b+σ,3+2σ,(R*exp(pi*im*n[i]))))))+
+                (((θμ[4]^2 + (θμ[3] + σ)^2)/2σ)*
+                (_₂F₁(a+σ+1, b+1+σ,1+2σ, (R*exp(pi*im*n[i]))))*
+                (_₂F₁(1+a+σ, 1+b+σ, 2+2σ,(R*exp(pi*im*n[j]))))) )));
+            else
+                kernela[i,(j+N)] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ( ((1-(R*exp(im*pi*n[j])))^(2θμ[3]))
+                *(((θμ[4]^2 - (θμ[3]+ σ)^2 )^2)/(2σ*(1+σ)))*(((R*exp(im*pi*n[i]))*
+                ( _₂F₁(a+σ,b+σ,2σ,(R*exp(pi*im*n[j]))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(R*exp(pi*im*n[i])))))+
+                ((R*exp(pi*im*n[j]))*(_₂F₁(a+σ,b+σ,2σ,(R*exp(pi*im*n[i]))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(R*exp(pi*im*n[j])))))))/
+                ((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j])));
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j )
+                kernela[i+N, j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                (((1-(R*exp(pi*im*n[j])))^(2θμ[3]))*
+                ((θμ[4]^2 - (θμ[3]-σ)^2)/(2σ*(1-2σ)))*
+                (((R*exp(im*pi*n[j]))*(((θμ[3]-σ)^2 - θμ[4]^2)/(-2σ))*
+                (_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[j]))))*
+                (_₂F₁(1+a-σ, 1+b-σ,1-2σ,(R*exp(pi*im*n[i])))))
+                -((_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[i]))))*
+                (_₂F₁(a-σ, b-σ,-2σ,(R*exp(pi*im*n[j])))))
+                -((R*exp(pi*im*n[i]))*(((1+θμ[3]-σ)^2 - θμ[4]^2)/(-2σ))*
+                (_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[j]))))*
+                (_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[j])))))));
+            else
+                kernela[i+N, j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                (((1- (R*exp(pi*im*n[j])))^(2θμ[3]))*
+                ((θμ[4]^2 - (θμ[3]-σ)^2)/(2σ*(1-2σ)))*
+                (((R*exp(pi*im*n[j]))*
+                (_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[j]))) )*
+                (_₂F₁(a-σ,b-σ, -2σ, (R*exp(pi*im*n[i])))))-
+                ((R*exp(pi*im*n[j]))*
+                (_₂F₁(1+a-σ,1+b-σ,2-2σ,(R*exp(pi*im*n[i]))))*
+                (_₂F₁(a-σ,b-σ,-2σ,(R*exp(pi*im*n[j])))))))/((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j])));
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j)
+                kernela[i+N,j+N] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ((((1-(R*exp(pi*im*n[j])))^(2θμ[3])))*
+                (((_₂F₁(1+a-σ,1+b-σ,1-2σ,(R*exp(pi*im*n[i]))))*
+                (_₂F₁(a+σ, b+σ,2σ,(R*exp(pi*im*n[j]))))*
+                (((θμ[3]-σ)^2 - θμ[4]^2)/(-2σ)))+
+                ((((θμ[4]^2 - (θμ[3]+σ)^2)/((2σ)*(1+2σ))))*
+                (((θμ[4]^2 - (θμ[3]-σ)^2)/((2σ)*(1-2σ))))*(R*exp(pi*im*n[j]))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(R*exp(pi*im*n[j]))))*
+                ((_₂F₁(1+a-σ, 1+b-σ,2-2σ,(R*exp(pi*im*n[i]))))+
+                ((R*exp(pi*im*n[i]))*(((1+θμ[3]-σ)^2 - θμ[4]^2)/(2-2σ))*
+                (_₂F₁(2+a-σ,2+b-σ,2-2σ,(R*exp(pi*im*n[i])))))))));
+            else
+                kernela[i+N,j+N] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ((((1-(R*exp(pi*im*n[j])))^(2θμ[3]))*
+                (((_₂F₁(a-σ, b-σ,-2σ,(R*exp(pi*im*n[i]))))*
+                (_₂F₁(a+σ, b+σ,2σ,(R*exp(pi*im*n[j])))))
+                +(((θμ[4]^2 - (θμ[3]+σ)^2)/((2σ)*(1+2σ)))*
+                ((θμ[4]^2 - (θμ[3]-σ)^2)/((2σ)*(1-2σ)))*((R^2)*exp(pi*im*(n[i]+n[j])))*
+                (_₂F₁(1+a-σ,1+b-σ,2-2σ, (R*exp(pi*im*n[i]))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+σ,(R*exp(pi*im*n[j])))))))-1)/
+                ((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j])));
+        end
+        end
+    end
+    return kernela
+end
+
+function Kerd(θμ, σ, η, t)
+    n,w = gausslegendre(N)
+    kerneld = zeros(ComplexF64, 2N, 2N)
+    a=(θμ[2]+θμ[1]);
+    b=(θμ[2]-θμ[1]);
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j )
+                kerneld[i,j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                (((1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                (t/((R^2)*exp(2*pi*im*n[i])))*
+                ( ( (((θμ[2]-σ)^2 - θμ[1])/(2σ*(1-2σ)))*
+                ((_₂F₁(1+a-σ,1+b-σ,1-2σ,(t/(R*exp(pi*im*n[i])))))*
+                (_₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[j])))))))
+                +(((θμ[1]^2 - (θμ[2]-σ)^2)/(2σ*(1-2σ)))*
+                ((θμ[1]^2 -(θμ[2]+σ)^2)/(2σ*(1+2σ)*(R*exp(pi*im*n[j]))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[j])))))*
+                (((((1+θμ[2]-σ)^2 - θμ[1]^2)/(2-2σ))*
+                (_₂F₁(2+a-σ,2+b-σ,3-2σ,(t/(R*exp(pi*im*n[i])))))*(t^2)/(R*exp(pi*im*n[i])))
+                +(_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[i]))))*(t)))) ));
+             else
+                kerneld[i,j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                (1- ( ( (1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                ( ((_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[i])))))*
+                (_₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[j]))))))
+                +( ((θμ[1]^2 - (θμ[2]-σ)^2)/(2σ*(1-2σ)))*
+                ((θμ[1]^2 -(θμ[2]+σ)^2)/(2σ*(1+2σ)))*
+                (t/((R^2)*(exp(pi*im*(n[i]+n[j])))))*
+                (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[i])))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[j])))) ) ))))/
+                ( (R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j])) );
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if ( i == j)
+                kerneld[i,(N+j)] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*(exp(-im*η))
+                ( (((1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                ((-t)^(2-2σ))*((θμ[1]^2 - (θμ[2]-σ)^2)/(2σ*(1-2σ)))/
+                ((R^2)*exp(2pi*im*n[i])))*(((((1+θμ[2]-σ)^2 - θμ[1]^2)/(2-2σ))*
+                (_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[j])))))*
+                (_₂F₁(2+a-σ,2+b-σ,3-2σ,(t/(R*exp(pi*im*n[i])))))/(R*exp(pi*im*n[i])))
+                +((_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[j])))) )*
+                (_₂F₁(1+a-σ,1+b-σ,3-2σ,(t/(R*exp(pi*im*n[i])))))/t)
+                -( (((θμ[2]-σ)^2 - θμ[1]^2)/(-2σ))*
+                (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[j])))))*
+                (_₂F₁(1+a-σ,1+b-σ,1-2σ,(t/(R*exp(pi*im*n[i])))))/
+                (R*exp(pi*im*n[j])) )));
+             else
+                 kerneld[i,(j+N)] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*(((exp(-im*η))*
+                 ( (1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                 (t^(1-2σ))*((θμ[1]^2 - (θμ[2]-σ)^2)/(2σ*(1-2σ)))*
+                 (((_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[j])))) )*
+                 (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[i])))))/
+                 (R*exp(pi*im*n[i])))
+                 -((_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[i])))))*
+                 (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[j])))))/
+                 (R*exp(pi*im*n[j])))))/
+                 ((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j]))));
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j )
+                kerneld[(i+N),j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*(
+                (( (1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*((t)^(1+2σ))*(exp(im*η))*
+                ((θμ[1]^2 - (θμ[2]+σ)^2)/(2σ*(1+2σ)))/((R^2)*exp(2pi*im*n[i])))*
+                ( ( ( _₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[j])))) )*
+                (((_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[i])))))/t)
+                +((( (1+θμ[2]+σ)^2 - θμ[1]^2)/(2+2σ))*
+                (_₂F₁(2+a+σ,2+b+σ,3+2σ,(t/(R*exp(pi*im*n[i])))))/
+                (R*exp(pi*im*n[i])) ) ) )
+                -((( (θμ[2]+σ)^2 - θμ[1]^2)/(2σ))*
+                (_₂F₁(1+a+σ,1+b+σ,1+2σ,(t/(R*exp(pi*im*n[i])))))*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[j])))))/
+                (R*exp(pi*im*n[j]))) ) );
+             else
+                 kerneld[(i+N),j] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                 ( ( ((1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*((-t)^(1+2σ))*
+                 (exp(im*η))*((θμ[1]^2 - (θμ[2]+σ)^2)/(2σ*(1+2σ)))*
+                 (( (_₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[j])))))*
+                 (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[i])))))/
+                 (R*exp(pi*im*n[i])) )
+                 - ((_₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[i])))))*
+                 (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[j])))))/
+                 (R*exp(pi*im*n[j])))))/
+                 ((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j]))));
+            end
+        end
+    end
+    Threads.@threads for i = 1:N
+        Threads.@threads for j = 1:N
+            if (i == j )
+                kerneld[(i+N),(j+N)] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                ( ((1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                ( (t/(R^2)*exp(2pi*im*n[i]))*
+                ( ( (((θμ[2]+σ)^2 - θμ[1]^2)/(2σ))*
+                (_₂F₁(1+a+σ,1+b+σ,1+2σ,(t/(R*exp(pi*im*n[i])))) )*
+                (_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[j]))))))
+                +( (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[j])))))*
+                ( ((_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[i])))))/t)
+                +((_₂F₁(2+a+σ,2+b+σ,3+2σ,(t/(R*exp(pi*im*n[i])))))/
+                (R*exp(pi*im*n[i]))) ) ) ) ) );
+             else
+                kerneld[(i+N),(j+N)] = (1/(2*pi*im))*((sqrt(w[i]))*(sqrt(w[j])))*
+                (( 1-(( (1-(t/(R*exp(pi*im*n[j]))))^(2θμ[2]))*
+                (((_₂F₁(a+σ,b+σ,2σ,(t/(R*exp(pi*im*n[i])))))*
+                (_₂F₁(a-σ,b-σ,-2σ,(t/(R*exp(pi*im*n[j]))))))
+                +( ((θμ[1]^2 -(θμ[2]-σ)^2)/(2σ*(1-2σ)))*
+                (((θμ[1]^2 -(θμ[2]+σ)^2)/(2σ*(1+2σ))))*
+                ((t^2)/((R^2)*exp(pi*im*(n[i]+n[j]))))*
+                (_₂F₁(1+a-σ,1+b-σ,2-2σ,(t/(R*exp(pi*im*n[j])))) )*
+                (_₂F₁(1+a+σ,1+b+σ,2+2σ,(t/(R*exp(pi*im*n[i])))) ) ) ) ) )/
+                ((R*exp(pi*im*n[i]))-(R*exp(pi*im*n[j]))) );
+            end
+        end
+    end
+    return kerneld
+end
+
+function τVI( θμ, σ, η, t)
+    OPA = Kera(θμ, σ[1])
+    OPD = Kerd(θμ, σ[1], η, t)
+    OPK = (OPA*OPD)
+    Fred = (Matrix{Float64}(I,2N,2N)-OPK);
+    τ = (t^(((σ[1]^2) - (θμ[1]^2) - (θμ[2]^2))/4))*((1-t)^(-2*θμ[2]*θμ[3]))*(det(Fred));
+    return τ
+end
+
+function σVI(θμ, σ, η, t)
+    a = (θμ[1]^2 + θμ[2]^2 + θμ[3]^2 + θμ[4]^2)/2;
+    b = (θμ[3]^2 + θμ[2]^2 - θμ[1]^2 - θμ[4]^2)/2;
+    c = 2*θμ[2]*θμ[3];
+    OPA = Kera(θμ, σ[1])
+    OPD = Kerd(θμ, σ[1], η, t)
+    OPK = (OPA*OPD)
+    Fred = (Matrix{Float64}(I,2N,2N)-OPK);
+    Fredinv = -inv(Fred)
+    OPDD = KerdDDiff(θμ, σ, η, t)
+    OPDDiff = OPA*OPDD
+    FinalM = Fredinv*OPDDiff
+    trace = (σ[1]^2-θμ[1]^2-θμ[2]^2)/(4*t)- (θμ[2]*θμ[3])/(2*(t-1)) +tr(FinalM)
+    prefactor = -(θμ[1]^2+θμ[2]^2-θμ[3]^2-θμ[4]^2)/8+(θμ[2]^2-θμ[4]^2)/4*t;
+    return t*(t-1)*trace+prefactor
+end
+
+#θs = [1/(2sqrt(2)), (1/(2sqrt(2)))im, 1/(2sqrt(2)), -2]
+#σs = [(1/(2sqrt(2)))*(2+im), (1/(2sqrt(2)))*(2+im), 1]
+θs = [ 0.3804+0.6212*im 0.8364-0.4218*im 0.6858+0.6628*im 0.0326+0.3610*im ]
+σs = [ -0.6544-0.9622*im 0.1916+0.6336*im 0.9524+0.2056*im ]
+η = computeη(θs, σs)
+t= ComplexF64(0.1)
+
+ Painleveτ = τVI( θs, σs, η, t)
+#print(Painleveτ)
+#Painleveσ = σVI(θs, σs, η, t)
+
+OPA = Kera(θs, σs[1])
+det(OPA)
