@@ -1,0 +1,39 @@
+#Continuous Fraction Calculation
+
+    #Terms of the fractions
+Qterm(θ) = 4*(1 - ((θ[1] + θ[2] + θ[3] + θ[4])/2) )*(1 - ((θ[1] + θ[2] + θ[3] - θ[4])/2))
+A(σ, θ, N) = (σ[1] +θ[1] + θ[2] + 2(N-2))*(σ[1] - θ[1] - θ[2] - 2*θ[3] + 2N) + qterm(θ)
+B(σ, θ, N) = (σ[1] +θ[1] + θ[2] + 2(N-1))*(σ[1] - θ[1] - θ[2] + 2N)
+Cwk(σ, θ, N) = (σ[1] +θ[1] + θ[2] + 2(N-1))*(σ[1] - θ[1] + θ[2] - 2*θ[3] + 2N) + qterm(θ)
+D(σ, θ, N) =  (σ[1] -θ[1] + θ[2] + 2N)*(σ[1] + θ[1] + θ[2] + 2N)
+
+function Un(σ, θ, t0, K, N)
+    last=0
+    for i=0:N
+        last = (A(σ, θ, N-i)/( B(σ,θ,N) + t0*( Cwk(σ, θ, N) + 4*(t0-1)*K - (D(σ, θ, N)*last)  ) ))
+    end
+    return last
+end
+
+function Vn(σ,θ, t0, K, N)
+    last = 0
+    for i=0:N
+        last = (D(σ,θ, N-i)/( B(σ,θ,N) + t0*( Cwk(σ,θ,N) + 4*(t0-1)*K - (A(σ,θ,N)*last) ) ))
+    end
+    return last
+end
+
+function EqualFunction(θ, σ, t0, K, N)
+    return (t0*( (A(σ, θ, N)*Vn(σ, θ, t0, K, N)) - Cwk(σ, θ, N) - 4*(t0-1)*K + (D(σ, θ,N)*Un(σ, θ, t0, K, N)) ) ) - B(σ, θ, N)
+end
+
+θs = [ 0.3804+0.6212*im 0.8364-0.4218*im 0.6858+0.6628*im 0.0326+0.3610*im ]
+σs = [ -0.6544-0.9622*im 0.1916+0.6336*im 0.9524+0.2056*im ]
+t = ComplexF64(1e-5)
+N =500
+K =0.1
+
+EqualFunction(θs, σs, t, K, N)
+F(k) = real(EqualFunction(θs, σs, t, k, N))
+
+ brent(F, 0.1, 0.9)
