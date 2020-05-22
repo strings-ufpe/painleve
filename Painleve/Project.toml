@@ -1,0 +1,8 @@
+name = "Painleve"
+uuid = "24bcf1d2-db81-49e8-810c-6c8c5b79c475"
+authors = ["Bruno Carneiro da Cunha <bcunha@df.ufpe.br>"]
+version = "0.1.0"
+
+[deps]
+ArbNumerics = "7e558dbc-694d-5a72-987c-6f4ebed21442"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
