@@ -3,7 +3,7 @@ using ArbNumerics, LinearAlgebra
 # This computes the Painlevé VI tau function using the Fourier decomposition outlined in
 # GL2016.
 
-Nf = 48
+global Nf = 48
 setprecision(ArbComplex,digits=64)
 
 function pieV(th1,th2,th3,sig)
